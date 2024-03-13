@@ -1,17 +1,11 @@
-import React, { useEffect } from 'react'
-import { useSelector, useDispatch } from 'react-redux'
+import React, { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { PostAuthor, TimeAgo, ReactionButton } from './index'
 import { Spinner } from '../../components/Spinner'
-import {
-  selectAllPosts,
-  fetchPosts,
-  selectPostIds,
-  selectPostById,
-} from './postsSlice'
 
-let PostExcerpt = ({ postId }) => {
-  const post = useSelector((state) => selectPostById(state, postId))
+import { useGetPostsQuery } from '../api/apiSlice'
+
+let PostExcerpt = ({ post }) => {
   return (
     <article className="post-excerpt">
       <h3>{post.title}</h3>
@@ -32,29 +26,30 @@ let PostExcerpt = ({ postId }) => {
 PostExcerpt = React.memo(PostExcerpt)
 
 export const PostsList = () => {
-  const dispatch = useDispatch()
-  const orderedPostIds = useSelector(selectPostIds)
-  const posts = useSelector(selectAllPosts)
-  const postStatus = useSelector((state) => state.posts.status)
-  const error = useSelector((state) => state.posts.error)
+  const {
+    data: posts = [],
+    isLoading,
+    isSuccess,
+    isError,
+    error,
+  } = useGetPostsQuery()
 
-  useEffect(() => {
-    if (postStatus === 'idle') {
-      dispatch(fetchPosts())
-    }
-  }, [postStatus, dispatch])
+  const sortedPosts = useMemo(() => {
+    const sortedPosts = posts.slice()
+    sortedPosts.sort((a, b) => b.date.localeCompare(a.date))
+    return sortedPosts
+  }, [posts])
 
   let content
 
-  if (postStatus === 'loading') {
+  if (isLoading) {
     content = <Spinner text="Loading..." />
-  } else if (postStatus === 'succeeded') {
-    // Sort posts in reverse chronological order by datetime string
-    content = orderedPostIds.map((postId) => (
-      <PostExcerpt key={postId} postId={postId} />
+  } else if (isSuccess) {
+    content = sortedPosts.map((post) => (
+      <PostExcerpt key={post.id} post={post} />
     ))
-  } else if (postStatus === 'failed') {
-    content = <div>{error}</div>
+  } else if (isError) {
+    content = <div>{error.toString()}</div>
   }
 
   return (
